@@ -69,6 +69,7 @@
  | <a href="#S"><strong>S</strong></a>
  | <a href="#T"><strong>T</strong></a>
  | <a href="#V"><strong>V</strong></a>
+ | <a href="#W"><strong>W</strong></a>
  
 </div>
 <h2 id="A">A</h2>
@@ -85,7 +86,7 @@
   </dl></td>
   <td style="width: 33%" valign="top"><dl>
       
-  <dt><a href="index.html#mir_eval.structure.ari">ari() (in module mir_eval.structure)</a>
+  <dt><a href="index.html#mir_eval.segment.ari">ari() (in module mir_eval.segment)</a>
   </dt>
 
   </dl></td>
@@ -143,13 +144,13 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%" valign="top"><dl>
       
-  <dt><a href="index.html#mir_eval.boundary.detection">detection() (in module mir_eval.boundary)</a>
+  <dt><a href="index.html#mir_eval.segment.detection">detection() (in module mir_eval.segment)</a>
   </dt>
 
   </dl></td>
   <td style="width: 33%" valign="top"><dl>
       
-  <dt><a href="index.html#mir_eval.boundary.deviation">deviation() (in module mir_eval.boundary)</a>
+  <dt><a href="index.html#mir_eval.segment.deviation">deviation() (in module mir_eval.segment)</a>
   </dt>
 
   </dl></td>
@@ -173,9 +174,35 @@
   </dt>
 
       
-  <dt><a href="index.html#mir_eval.chord.evaluate_file_pair">evaluate_file_pair() (in module mir_eval.chord)</a>
+  <dt><a href="index.html#mir_eval.beat.evaluate">evaluate() (in module mir_eval.beat)</a>
   </dt>
 
+      <dd><dl>
+        
+  <dt><a href="index.html#mir_eval.chord.evaluate">(in module mir_eval.chord)</a>
+  </dt>
+
+        
+  <dt><a href="index.html#mir_eval.melody.evaluate">(in module mir_eval.melody)</a>
+  </dt>
+
+        
+  <dt><a href="index.html#mir_eval.onset.evaluate">(in module mir_eval.onset)</a>
+  </dt>
+
+        
+  <dt><a href="index.html#mir_eval.pattern.evaluate">(in module mir_eval.pattern)</a>
+  </dt>
+
+        
+  <dt><a href="index.html#mir_eval.segment.evaluate">(in module mir_eval.segment)</a>
+  </dt>
+
+        
+  <dt><a href="index.html#mir_eval.separation.evaluate">(in module mir_eval.separation)</a>
+  </dt>
+
+      </dl></dd>
   </dl></td>
 </tr></table>
 
@@ -197,7 +224,7 @@
 
       </dl></dd>
       
-  <dt><a href="index.html#mir_eval.util.filter_labeled_intervals">filter_labeled_intervals() (in module mir_eval.util)</a>
+  <dt><a href="index.html#mir_eval.util.filter_kwargs">filter_kwargs() (in module mir_eval.util)</a>
   </dt>
 
       
@@ -269,6 +296,10 @@
   </dt>
 
       
+  <dt><a href="index.html#mir_eval.util.intervals_to_durations">intervals_to_durations() (in module mir_eval.util)</a>
+  </dt>
+
+      
   <dt><a href="index.html#mir_eval.util.intervals_to_samples">intervals_to_samples() (in module mir_eval.util)</a>
   </dt>
 
@@ -293,37 +324,37 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%" valign="top"><dl>
       
-  <dt><a href="index.html#mir_eval.input_output.load_delimited">load_delimited() (in module mir_eval.input_output)</a>
+  <dt><a href="index.html#mir_eval.io.load_delimited">load_delimited() (in module mir_eval.io)</a>
   </dt>
 
       
-  <dt><a href="index.html#mir_eval.input_output.load_events">load_events() (in module mir_eval.input_output)</a>
+  <dt><a href="index.html#mir_eval.io.load_events">load_events() (in module mir_eval.io)</a>
   </dt>
 
       
-  <dt><a href="index.html#mir_eval.input_output.load_intervals">load_intervals() (in module mir_eval.input_output)</a>
+  <dt><a href="index.html#mir_eval.io.load_intervals">load_intervals() (in module mir_eval.io)</a>
   </dt>
 
       
-  <dt><a href="index.html#mir_eval.input_output.load_labeled_events">load_labeled_events() (in module mir_eval.input_output)</a>
+  <dt><a href="index.html#mir_eval.io.load_labeled_events">load_labeled_events() (in module mir_eval.io)</a>
   </dt>
 
   </dl></td>
   <td style="width: 33%" valign="top"><dl>
       
-  <dt><a href="index.html#mir_eval.input_output.load_labeled_intervals">load_labeled_intervals() (in module mir_eval.input_output)</a>
+  <dt><a href="index.html#mir_eval.io.load_labeled_intervals">load_labeled_intervals() (in module mir_eval.io)</a>
   </dt>
 
       
-  <dt><a href="index.html#mir_eval.input_output.load_patterns">load_patterns() (in module mir_eval.input_output)</a>
+  <dt><a href="index.html#mir_eval.io.load_patterns">load_patterns() (in module mir_eval.io)</a>
   </dt>
 
       
-  <dt><a href="index.html#mir_eval.input_output.load_time_series">load_time_series() (in module mir_eval.input_output)</a>
+  <dt><a href="index.html#mir_eval.io.load_time_series">load_time_series() (in module mir_eval.io)</a>
   </dt>
 
       
-  <dt><a href="index.html#mir_eval.input_output.load_wav">load_wav() (in module mir_eval.input_output)</a>
+  <dt><a href="index.html#mir_eval.io.load_wav">load_wav() (in module mir_eval.io)</a>
   </dt>
 
   </dl></td>
@@ -353,15 +384,11 @@
   </dt>
 
       
-  <dt><a href="index.html#module-mir_eval.boundary">mir_eval.boundary (module)</a>
-  </dt>
-
-      
   <dt><a href="index.html#module-mir_eval.chord">mir_eval.chord (module)</a>
   </dt>
 
       
-  <dt><a href="index.html#module-mir_eval.input_output">mir_eval.input_output (module)</a>
+  <dt><a href="index.html#module-mir_eval.io">mir_eval.io (module)</a>
   </dt>
 
       
@@ -379,15 +406,15 @@
   </dt>
 
       
+  <dt><a href="index.html#module-mir_eval.segment">mir_eval.segment (module)</a>
+  </dt>
+
+      
   <dt><a href="index.html#module-mir_eval.separation">mir_eval.separation (module)</a>
   </dt>
 
       
   <dt><a href="index.html#module-mir_eval.sonify">mir_eval.sonify (module)</a>
-  </dt>
-
-      
-  <dt><a href="index.html#module-mir_eval.structure">mir_eval.structure (module)</a>
   </dt>
 
       
@@ -399,7 +426,7 @@
   </dt>
 
       
-  <dt><a href="index.html#mir_eval.structure.mutual_information">mutual_information() (in module mir_eval.structure)</a>
+  <dt><a href="index.html#mir_eval.segment.mutual_information">mutual_information() (in module mir_eval.segment)</a>
   </dt>
 
   </dl></td>
@@ -409,7 +436,7 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%" valign="top"><dl>
       
-  <dt><a href="index.html#mir_eval.structure.nce">nce() (in module mir_eval.structure)</a>
+  <dt><a href="index.html#mir_eval.segment.nce">nce() (in module mir_eval.segment)</a>
   </dt>
 
   </dl></td>
@@ -439,7 +466,7 @@
   </dt>
 
       
-  <dt><a href="index.html#mir_eval.structure.pairwise">pairwise() (in module mir_eval.structure)</a>
+  <dt><a href="index.html#mir_eval.segment.pairwise">pairwise() (in module mir_eval.segment)</a>
   </dt>
 
   </dl></td>
@@ -465,7 +492,7 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%" valign="top"><dl>
       
-  <dt><a href="index.html#mir_eval.structure.rand_index">rand_index() (in module mir_eval.structure)</a>
+  <dt><a href="index.html#mir_eval.segment.rand_index">rand_index() (in module mir_eval.segment)</a>
   </dt>
 
       
@@ -514,10 +541,6 @@
 
       
   <dt><a href="index.html#mir_eval.chord.scale_degree_to_semitone">scale_degree_to_semitone() (in module mir_eval.chord)</a>
-  </dt>
-
-      
-  <dt><a href="index.html#mir_eval.chord.score">score() (in module mir_eval.chord)</a>
   </dt>
 
       
@@ -598,10 +621,6 @@
 
       <dd><dl>
         
-  <dt><a href="index.html#mir_eval.boundary.validate">(in module mir_eval.boundary)</a>
-  </dt>
-
-        
   <dt><a href="index.html#mir_eval.chord.validate">(in module mir_eval.chord)</a>
   </dt>
 
@@ -621,11 +640,11 @@
   <dt><a href="index.html#mir_eval.separation.validate">(in module mir_eval.separation)</a>
   </dt>
 
-        
-  <dt><a href="index.html#mir_eval.structure.validate">(in module mir_eval.structure)</a>
+      </dl></dd>
+      
+  <dt><a href="index.html#mir_eval.segment.validate_boundary">validate_boundary() (in module mir_eval.segment)</a>
   </dt>
 
-      </dl></dd>
       
   <dt><a href="index.html#mir_eval.chord.validate_chord_label">validate_chord_label() (in module mir_eval.chord)</a>
   </dt>
@@ -641,11 +660,25 @@
   </dt>
 
       
+  <dt><a href="index.html#mir_eval.segment.validate_structure">validate_structure() (in module mir_eval.segment)</a>
+  </dt>
+
+      
   <dt><a href="index.html#mir_eval.melody.validate_voicing">validate_voicing() (in module mir_eval.melody)</a>
   </dt>
 
       
   <dt><a href="index.html#mir_eval.melody.voicing_measures">voicing_measures() (in module mir_eval.melody)</a>
+  </dt>
+
+  </dl></td>
+</tr></table>
+
+<h2 id="W">W</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%" valign="top"><dl>
+      
+  <dt><a href="index.html#mir_eval.chord.weighted_accuracy">weighted_accuracy() (in module mir_eval.chord)</a>
   </dt>
 
   </dl></td>
