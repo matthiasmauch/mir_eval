@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-# CREATED: 2013-08-13 12:31:25 by Dawen Liang <dliang@ee.columbia.edu>
 '''
 Source separation algorithms attempt to extract recordings of individual
 sources from a recording of a mixture of sources.  Evaluation methods for
@@ -42,6 +41,10 @@ import warnings
 from . import util
 
 
+# The maximum allowable number of sources (prevents insane computational load)
+MAX_SOURCES = 100
+
+
 def validate(reference_sources, estimated_sources):
     '''Checks that the input data to a metric are valid, and throws helpful
     errors if not.
@@ -52,11 +55,6 @@ def validate(reference_sources, estimated_sources):
         - estimated_sources : np.ndarray, shape=(nsrc, nsampl)
             matrix containing estimated sources
     '''
-    # make sure the input is of shape (nsrc, nsampl)
-    if estimated_sources.ndim == 1:
-        estimated_sources = estimated_sources[np.newaxis, :]
-    if reference_sources.ndim == 1:
-        reference_sources = reference_sources[np.newaxis, :]
 
     if reference_sources.shape != estimated_sources.shape:
         raise ValueError('The shape of estimated sources and the true '
@@ -69,10 +67,41 @@ def validate(reference_sources, estimated_sources):
         warnings.warn("reference_sources is empty, should be of size "
                       "(nsrc, nsample).  sdr, sir, sar, and perm will all "
                       "be empty np.ndarrays")
+    elif np.any(np.all(reference_sources == 0, axis=1)):
+        raise ValueError('All the reference sources should be non-silent (not '
+                         'all-zeros), but at least one of the reference '
+                         'sources is all 0s, which introduces ambiguity to the'
+                         ' evaluation. (Otherwise we can add infinitely many '
+                         'all-zero sources.)')
+
     if estimated_sources.size == 0:
         warnings.warn("estimated_sources is empty, should be of size "
                       "(nsrc, nsample).  sdr, sir, sar, and perm will all "
                       "be empty np.ndarrays")
+    elif np.any(np.all(estimated_sources == 0, axis=1)):
+        raise ValueError('All the estimated sources should be non-silent (not '
+                         'all-zeros), but at least one of the estimated '
+                         'sources is all 0s. Since we require each reference '
+                         'source to be non-silent, having a silent estiamted '
+                         'source will result in an underdetermined system.')
+
+    if estimated_sources.shape[0] > MAX_SOURCES:
+        raise ValueError('The supplied matrices should be of shape (n_sources,'
+                         ' n_samples) but estimated_sources.shape[0] = {} '
+                         'which is greater than '
+                         'mir_eval.separation.MAX_SOURCES = {}.  To override '
+                         'this check, set mir_eval.separation.MAX_SOURCES to '
+                         'a larger value.'.format(estimated_sources.shape[0],
+                                                  MAX_SOURCES))
+
+    if reference_sources.shape[0] > MAX_SOURCES:
+        raise ValueError('The supplied matrices should be of shape (n_sources,'
+                         ' n_samples) but reference_sources.shape[0] = {} '
+                         'which is greater than '
+                         'mir_eval.separation.MAX_SOURCES = {}.  To override '
+                         'this check, set mir_eval.separation.MAX_SOURCES to '
+                         'a larger value.'.format(estimated_sources.shape[0],
+                                                  MAX_SOURCES))
 
 
 def bss_eval_sources(reference_sources, estimated_sources):
@@ -123,6 +152,12 @@ def bss_eval_sources(reference_sources, estimated_sources):
             separation," IEEE Trans.  on Audio, Speech and Language Processing,
             14(4):1462-1469, 2006.
     '''
+
+    # make sure the input is of shape (nsrc, nsampl)
+    if estimated_sources.ndim == 1:
+        estimated_sources = estimated_sources[np.newaxis, :]
+    if reference_sources.ndim == 1:
+        reference_sources = reference_sources[np.newaxis, :]
 
     validate(reference_sources, estimated_sources)
     # If empty matrices were supplied, return empty lists (special case)
@@ -231,10 +266,21 @@ def _bss_source_crit(s_true, e_spat, e_interf, e_artif):
     '''
     # energy ratios
     s_filt = s_true + e_spat
-    sdr = 10 * np.log10(np.sum(s_filt**2) / np.sum((e_interf + e_artif)**2))
-    sir = 10 * np.log10(np.sum(s_filt**2) / np.sum(e_interf**2))
-    sar = 10 * np.log10(np.sum((s_filt + e_interf)**2) / np.sum(e_artif**2))
+    sdr = _safe_db(np.sum(s_filt**2), np.sum((e_interf + e_artif)**2))
+    sir = _safe_db(np.sum(s_filt**2), np.sum(e_interf**2))
+    sar = _safe_db(np.sum((s_filt + e_interf)**2), np.sum(e_artif**2))
     return (sdr, sir, sar)
+
+
+def _safe_db(num, den):
+    '''
+    Properly handle the potential +Inf db SIR, instead of raising a
+    RuntimeWarning. Only denominator is checked because the numerator can never
+    be 0.
+    '''
+    if den == 0:
+        return np.Inf
+    return 10 * np.log10(num / den)
 
 
 def evaluate(reference_sources, estimated_sources, **kwargs):

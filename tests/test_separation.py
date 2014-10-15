@@ -26,7 +26,7 @@ def __load_and_stack_wavs(directory):
     '''
     stacked_audio_data = []
     global_fs = None
-    for f in glob.glob(os.path.join(directory, '*.wav')):
+    for f in sorted(glob.glob(os.path.join(directory, '*.wav'))):
         audio_data, fs = mir_eval.io.load_wav(f)
         assert (global_fs is None or fs == global_fs)
         global_fs = fs
@@ -48,10 +48,24 @@ def __unit_test_separation_function(metric):
         # And that the metric returns empty arrays
         assert np.allclose(metric(np.array([]), np.array([])), np.array([]))
 
+    # Test for error when there is a silent reference/estimated source
+    ref_sources = np.vstack((np.zeros(100),
+                             np.random.random_sample((2, 100))))
+    est_sources = np.vstack((np.zeros(100),
+                             np.random.random_sample((2, 100))))
+    nose.tools.assert_raises(ValueError, metric, ref_sources[:2],
+                             est_sources[1:])
+    nose.tools.assert_raises(ValueError, metric, ref_sources[1:],
+                             est_sources[:2])
+
     # Test for error when shape is different
     ref_sources = np.random.random_sample((4, 100))
     est_sources = np.random.random_sample((3, 100))
     nose.tools.assert_raises(ValueError, metric, ref_sources, est_sources)
+
+    # Test for error when too many sources are provided
+    sources = np.random.random_sample((mir_eval.separation.MAX_SOURCES*2, 400))
+    nose.tools.assert_raises(ValueError, metric, sources, sources)
 
 
 def __check_score(sco_f, metric, score, expected_score):

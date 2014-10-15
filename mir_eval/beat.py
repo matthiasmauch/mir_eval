@@ -50,6 +50,10 @@ from . import util
 import warnings
 
 
+# The maximum allowable beat time
+MAX_TIME = 30000.
+
+
 def trim_beats(beats, min_beat_time=5.):
     '''Removes beats before min_beat_time.  A common preprocessing step.
 
@@ -88,7 +92,7 @@ def validate(reference_beats, estimated_beats):
     if estimated_beats.size == 0:
         warnings.warn("Estimated beats are empty.")
     for beats in [reference_beats, estimated_beats]:
-        util.validate_events(beats)
+        util.validate_events(beats, MAX_TIME)
 
 
 def _get_reference_beat_variations(reference_beats):
@@ -338,10 +342,10 @@ def goto(reference_beats,
         goto_criteria = 1
     else:
         # Get the track of maximal length
-        track_length = np.max(np.diff(incorrect_beats))
-        track_start = np.flatnonzero(np.diff(incorrect_beats) == track_length)
+        track_len = np.max(np.diff(incorrect_beats))
+        track_start = np.flatnonzero(np.diff(incorrect_beats) == track_len)[0]
         # Is the track length at least 25% of the song?
-        if track_length - 1 > .25*(reference_beats.shape[0] - 2):
+        if track_len - 1 > .25*(reference_beats.shape[0] - 2):
             goto_criteria = 1
             start_beat = incorrect_beats[track_start]
             end_beat = incorrect_beats[track_start + 1]
