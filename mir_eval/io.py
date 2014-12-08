@@ -215,6 +215,40 @@ def load_labeled_intervals(filename, delimiter=r'\s+'):
 
     return intervals, labels
 
+def load_value_intervals(filename, delimiter=r'\s+'):
+    r'''
+    Import intervals with associated values from an annotation file. The
+    file should consist of three columns: Two consisting of numeric values
+    corresponding to start and end time of each interval and a third
+    corresponding to a frequency or MIDI pitch.  This is primarily useful
+    for processing note events.
+
+    :parameters:
+        - filename : str
+            Path to the annotation file
+        - delimiter : str
+            Separator regular expression.
+            By default, lines will be split by any amount of whitespace ('\s+')
+
+    :returns:
+        - intervals : np.ndarray, shape=(n_events, 2)
+            array of event start and end time
+        - pitches : list of pitches
+            list of labels
+    '''
+    # Use our universal function to load in the events
+    starts, ends, values = load_delimited(filename, [float, float, float],
+                                          delimiter)
+    # Stack into an interval matrix
+    intervals = np.array([starts, ends]).T
+    # Validate them, but throw a warning in place of an error
+    try:
+        util.validate_intervals(intervals)
+    except ValueError as error:
+        warnings.warn(error.args[0])
+
+    return intervals, values
+
 
 def load_time_series(filename, delimiter=r'\s+'):
     r'''
