@@ -10,6 +10,7 @@ import collections
 import warnings
 from . import util
 
+import mir_eval
 
 def remove_zero_notes(interval, value):
     '''
@@ -36,7 +37,7 @@ def remove_zero_notes(interval, value):
     return outinterval, outvalue
 
 
-def rasterize_notes(interval, value, hopsize=0.01):
+def rasterize_notes(interval, value, max_time=0.0, hopsize=0.01):
     '''
     Takes a sequence of notes given by the time interval (in seconds) and
     a value and turns them into a single list of frame-wise values sampled
@@ -50,31 +51,37 @@ def rasterize_notes(interval, value, hopsize=0.01):
             Onset and offset time of each note
         - value : np.ndarray shape=(n_events, 1) (or list of values)
             Array of pitches or frequencies
+        - max_time : float
+            Maximum timestamp assumed. If zero, then the largest interval
+            offset timestamp is used.
         - hopsize : float
             Period in seconds at which to sample the notes
 
     :returns:
-        - rasterized_notes : np.ndarray, shape=(n_events, 1)
+        - values : np.ndarray, shape=(n_events, 1)
             Note values sampled at a regular hopsize intervals.
 
     '''
 
     interval, value = remove_zero_notes(interval, value)
 
+    max_time = max([interval.max(), max_time])
+    print max_time
     n_note = len(value)
-    n_frame = n_note / hopsize + 1
-    t = np.arange(n_frame) * hopsize
 
-    rasterized_notes = np.zeros((n_note, 1))
+    n_frame = max_time / hopsize + 1
+    times = np.arange(n_frame) * hopsize
+
+    values = np.zeros((n_frame, 1))
 
     for i_note in range(n_note):
-        index = np.logical_and(t >= inverval[i_note, 1],  
-                               t <  inverval[i_note, 2])
-        if max(f0[index]) > 0:
+        index = np.logical_and(times >= interval[i_note, 0],  
+                               times <  interval[i_note, 1])
+        if max(values[index]) > 0:
             raise # overlapping notes!
         else:
-            rasterized_notes[index] = value[i_note]
-    return rasterized_notes
+            values[index] = value[i_note]
+    return times, values
 
 
 def evaluate(ref_interval, ref_midi, est_interval, est_midi, **kwargs):
@@ -106,20 +113,21 @@ def evaluate(ref_interval, ref_midi, est_interval, est_midi, **kwargs):
 
     '''
 
-    ref_vector = rasterized_notes(ref_interval, ref_midi)
-    est_vector = rasterized_notes(est_interval, est_midi)
+    max_time = max(ref_interval.max(), est_interval.max())
+    ref_times, ref_midi = rasterize_notes(ref_interval, ref_midi, max_time)
+    est_times, est_midi = rasterize_notes(est_interval, est_midi, max_time)
 
     # Compute metrics
     scores = collections.OrderedDict()
 
-    # (scores['Voicing Recall'],
-    #  scores['Voicing False Alarm']) = util.filter_kwargs(voicing_measures,
-    #                                                      ref_voicing,
-    #                                                      est_voicing, **kwargs)
+    (scores['Voicing Recall'],
+     scores['Voicing False Alarm']) = util.filter_kwargs(mir_eval.melody.voicing_measures,
+                                                         ref_midi>0,
+                                                         est_midi>0, **kwargs)
 
-    # scores['Raw Pitch Accuracy'] = util.filter_kwargs(raw_pitch_accuracy,
-    #                                                   ref_voicing, ref_cent,
-    #                                                   est_voicing, est_cent,
-    #                                                   **kwargs)
+    scores['Raw Pitch Accuracy'] = util.filter_kwargs(mir_eval.melody.raw_pitch_accuracy,
+                                                      ref_midi>0, ref_midi*100,
+                                                      est_midi>0, est_midi*100,
+                                                      **kwargs)
 
     return scores

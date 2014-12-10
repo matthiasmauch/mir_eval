@@ -5,6 +5,7 @@
 from . import beat
 from . import chord
 from . import io
+from . import monophonic_note
 from . import onset
 from . import segment
 from . import separation

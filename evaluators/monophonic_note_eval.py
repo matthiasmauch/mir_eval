@@ -59,14 +59,14 @@ if __name__ == '__main__':
     parameters = process_arguments()
 
     # Load in the data from the provided files
-    (ref_time,
-     ref_freq) = mir_eval.io.load_value_intervals(parameters['reference_file'])
-    (est_time,
-     est_freq) = mir_eval.io.load_value_intervals(parameters['estimated_file'])
+    (ref_interval,
+     ref_midi) = mir_eval.io.load_value_intervals(parameters['reference_file'])
+    (est_interval,
+     est_midi) = mir_eval.io.load_value_intervals(parameters['estimated_file'])
 
     # Compute all the scores
-    scores = mir_eval.monophonic_note.evaluate(ref_time, ref_freq, est_time, 
-                                               est_freq, hop=parameters['hop'])
+    scores = mir_eval.monophonic_note.evaluate(ref_interval, ref_midi, 
+                                               est_interval, est_midi)
     print "{} vs. {}".format(os.path.basename(parameters['reference_file']),
                              os.path.basename(parameters['estimated_file']))
     eval_utilities.print_evaluation(scores)
