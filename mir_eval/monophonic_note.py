@@ -83,6 +83,24 @@ def rasterize_notes(interval, value, max_time=0.0, hopsize=0.01):
             values[index] = value[i_note]
     return times, values
 
+def calculate_overlaps(interval_A, midi_A, interval_B, midi_B):
+    '''
+    Calculate pair-wise time and time-and-pitch overlaps between notes in two
+    note tracks.
+
+    :parameters:
+        - interval_A : np.ndarray, shape=(n_events, 2)
+            Onset and offset time of each note in note track A.
+        - midi_A : np.ndarray
+            Array of MIDI note values (not necessarily integer) 
+            in note track A.
+        - interval_B : np.ndarray, shape=(n_events, 2)
+            Onset and offset time of each note in note track B.
+        - midi_B : np.ndarray
+            Array of MIDI note values (not necessarily integer) 
+            in note track A.
+    '''
+    pass
 
 def evaluate(ref_interval, ref_midi, est_interval, est_midi, **kwargs):
     '''
