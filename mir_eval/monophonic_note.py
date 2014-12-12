@@ -82,6 +82,51 @@ def rasterize_notes(interval, value, max_time=0.0, hopsize=0.01):
             values[index] = value[i_note]
     return times, values
 
+def calculate_seg_metrics(interval_A, midi_A, interval_B, midi_B, 
+                          midi_threshold=0.5, onset_threshold=0.05):
+    '''
+    Calculate segmentation metrics from Molina's paper and some additional
+    ones.
+
+    :parameters:
+        - interval_A : np.ndarray, shape=(n_events, 2)
+            Onset and offset time of each note in note track A.
+        - midi_A : np.ndarray
+            Array of MIDI note values (not necessarily integer) 
+            in note track A.
+        - interval_B : np.ndarray, shape=(n_events, 2)
+            Onset and offset time of each note in note track B.
+        - midi_B : np.ndarray
+            Array of MIDI note values (not necessarily integer) 
+            in note track A.
+
+    :returns:
+        TODO
+    '''
+    
+    n_A = len(midi_A)
+
+    time_overlaps = collections.OrderedDict()
+    timepitch_overlaps = collections.OrderedDict()
+
+    for i, iv_A in enumerate(interval_A):
+        for j, iv_B in enumerate(interval_B):
+            is_overlap = iv_A[0] <= iv_B[1] and iv_A[1] >= iv_B[0]
+
+            if is_overlap:
+                is_correct_pitch = abs(midi_A[i]-midi_B[j]) < midi_threshold
+                t_overlap = min(iv_B[1], iv_A[1]) - max(iv_B[0], iv_A[0])
+                rel_overlap_A = t_overlap/(iv_A[1]-iv_A[0])
+                rel_overlap_B = t_overlap/(iv_B[1]-iv_B[0])
+                time_overlaps[(i,j)] = (t_overlap,
+                                        rel_overlap_A, rel_overlap_B)
+
+                if is_correct_pitch:
+                    timepitch_overlaps[(i,j)] = (t_overlap,
+                                                 rel_overlap_A, rel_overlap_B)
+    # TODO -- implement the actual measures, these are just preliminary
+    return time_overlaps, timepitch_overlaps
+
 def calculate_matches(interval_A, midi_A, interval_B, midi_B, 
                       midi_threshold=0.5, onset_threshold=0.05):
     '''
@@ -110,9 +155,7 @@ def calculate_matches(interval_A, midi_A, interval_B, midi_B,
 
     matched = pd.DataFrame(0, index=range(n_A), 
                               columns=['COnPOff', 'COnP', 'COn'])
-    time_overlaps = collections.OrderedDict()
-    timepitch_overlaps = collections.OrderedDict()
-
+    
     conpoff_matches = []
     conp_matches = []
     con_matches = []
@@ -141,18 +184,7 @@ def calculate_matches(interval_A, midi_A, interval_B, midi_B,
                     matched.COn[i] = 1
                     con_matches.append(j)
 
-            # if is_overlap:
-            #     t_overlap = min(iv_B[1], iv_A[1]) - max(iv_B[0], iv_A[0])
-            #     rel_overlap_A = t_overlap/(iv_A[1]-iv_A[0])
-            #     rel_overlap_B = t_overlap/(iv_B[1]-iv_B[0])
-            #     time_overlaps[(i,j)] = (t_overlap,
-            #                             rel_overlap_A, rel_overlap_B)
-
-            #     if is_correct_pitch:
-            #         timepitch_overlaps[(i,j)] = (t_overlap,
-            #                                      rel_overlap_A, rel_overlap_B)
-
-    return matched #, time_overlaps, timepitch_overlaps
+    return matched
 
 def calculate_match_metrics(ref_interval, ref_midi, est_interval, est_midi):
     '''
@@ -255,6 +287,9 @@ def evaluate(ref_interval, ref_midi, est_interval, est_midi, **kwargs):
     scores['Recall COn'] = recall.COn
     scores['F Measure COn'] = fmeasure.COn
 
-    print precision, recall, fmeasure
+    time_overlaps, timepitch_overlaps =  calculate_seg_metrics(ref_interval,
+                                                               ref_midi,
+                                                               est_interval,
+                                                               est_midi)
 
     return scores
