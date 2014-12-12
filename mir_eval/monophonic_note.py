@@ -5,12 +5,13 @@
 '''
 
 import numpy as np
+import pandas as pd
 import scipy.interpolate
 import collections
 import warnings
-from . import util
+from .util import filter_kwargs
 
-import mir_eval
+from mir_eval.melody import voicing_measures, raw_pitch_accuracy
 
 def remove_zero_notes(interval, value):
     '''
@@ -63,10 +64,8 @@ def rasterize_notes(interval, value, max_time=0.0, hopsize=0.01):
 
     '''
 
-    interval, value = remove_zero_notes(interval, value)
-
     max_time = max([interval.max(), max_time])
-    print max_time
+
     n_note = len(value)
 
     n_frame = max_time / hopsize + 1
@@ -83,10 +82,11 @@ def rasterize_notes(interval, value, max_time=0.0, hopsize=0.01):
             values[index] = value[i_note]
     return times, values
 
-def calculate_overlaps(interval_A, midi_A, interval_B, midi_B):
+def calculate_matches(interval_A, midi_A, interval_B, midi_B, 
+                      midi_threshold=0.5, onset_threshold=0.05):
     '''
-    Calculate pair-wise time and time-and-pitch overlaps between notes in two
-    note tracks.
+    Calculate matches between two sets of note tracks, according to Molina's
+    proposed metrics.
 
     :parameters:
         - interval_A : np.ndarray, shape=(n_events, 2)
@@ -99,8 +99,93 @@ def calculate_overlaps(interval_A, midi_A, interval_B, midi_B):
         - midi_B : np.ndarray
             Array of MIDI note values (not necessarily integer) 
             in note track A.
+
+    :returns:
+        - matched : pd.DataFrame
+            Data frame containing the success rating (0 or 1) for Molina's
+            matching criteria on each note of note track A.
     '''
-    pass
+    
+    n_A = len(midi_A)
+
+    matched = pd.DataFrame(0, index=range(n_A), 
+                              columns=['COnPOff', 'COnP', 'COn'])
+    time_overlaps = collections.OrderedDict()
+    timepitch_overlaps = collections.OrderedDict()
+
+    conpoff_matches = []
+    conp_matches = []
+    con_matches = []
+
+    for i, iv_A in enumerate(interval_A):
+        offset_thresh = iv_A[0] + (iv_A[1]-iv_A[0]) * np.array([0.8, 1.2])
+
+        for j, iv_B in enumerate(interval_B):
+            is_overlap = iv_A[0] <= iv_B[1] and iv_A[1] >= iv_B[0]
+            is_correct_pitch = abs(midi_A[i]-midi_B[j]) < midi_threshold
+            is_matched_onset = abs(iv_A[0]-iv_B[0]) < onset_threshold
+            is_matched_offset = iv_B[1] > offset_thresh[0] and iv_B[1] < offset_thresh[1]
+
+            if is_matched_onset and is_correct_pitch and is_matched_offset:
+                if not j in conpoff_matches:
+                    matched.COnPOff[i] = 1
+                    conpoff_matches.append(j)
+
+            if is_matched_onset and is_correct_pitch:
+                if not j in conp_matches:
+                    matched.COnP[i] = 1
+                    conp_matches.append(j)
+
+            if is_matched_onset:
+                if not j in con_matches:
+                    matched.COn[i] = 1
+                    con_matches.append(j)
+
+            # if is_overlap:
+            #     t_overlap = min(iv_B[1], iv_A[1]) - max(iv_B[0], iv_A[0])
+            #     rel_overlap_A = t_overlap/(iv_A[1]-iv_A[0])
+            #     rel_overlap_B = t_overlap/(iv_B[1]-iv_B[0])
+            #     time_overlaps[(i,j)] = (t_overlap,
+            #                             rel_overlap_A, rel_overlap_B)
+
+            #     if is_correct_pitch:
+            #         timepitch_overlaps[(i,j)] = (t_overlap,
+            #                                      rel_overlap_A, rel_overlap_B)
+
+    return matched #, time_overlaps, timepitch_overlaps
+
+def calculate_match_metrics(ref_interval, ref_midi, est_interval, est_midi):
+    '''
+    Calculate matches between two sets of note tracks, according to Molina's
+    proposed metrics.
+
+    :parameters:
+        - interval_ref : np.ndarray, shape=(n_events, 2)
+            Onset and offset time of each note in reference note track.
+        - midi_ref : np.ndarray
+            Array of MIDI note values (not necessarily integer) 
+            in reference note track.
+        - interval_est : np.ndarray, shape=(n_events, 2)
+            Onset and offset time of each note in estimated note track.
+        - midi_est : np.ndarray
+            Array of MIDI note values (not necessarily integer) 
+            in estimated note track.
+
+    :returns:
+        - precision: pd.DataFrame
+
+    '''
+
+    matched_est_to_ref = calculate_matches(ref_interval, ref_midi, 
+                                           est_interval, est_midi)
+    matched_ref_to_est = calculate_matches(est_interval, est_midi, 
+                                           ref_interval, ref_midi)
+
+    precision = matched_ref_to_est.mean(0)
+    recall    = matched_est_to_ref.mean(0)
+    fmeasure  = 2 * precision * recall / (precision + recall)
+
+    return precision, recall, fmeasure
 
 def evaluate(ref_interval, ref_midi, est_interval, est_midi, **kwargs):
     '''
@@ -132,20 +217,44 @@ def evaluate(ref_interval, ref_midi, est_interval, est_midi, **kwargs):
     '''
 
     max_time = max(ref_interval.max(), est_interval.max())
-    ref_times, ref_midi = rasterize_notes(ref_interval, ref_midi, max_time)
-    est_times, est_midi = rasterize_notes(est_interval, est_midi, max_time)
+
+    ref_interval, ref_midi = remove_zero_notes(ref_interval, ref_midi)
+    est_interval, est_midi = remove_zero_notes(est_interval, est_midi)
+
+    ref_frame_times, ref_frame_midi = rasterize_notes(ref_interval, ref_midi,
+                                                      max_time)
+    est_frame_times, est_frame_midi = rasterize_notes(est_interval, est_midi,
+                                                      max_time)
 
     # Compute metrics
     scores = collections.OrderedDict()
 
     (scores['Voicing Recall'],
-     scores['Voicing False Alarm']) = util.filter_kwargs(mir_eval.melody.voicing_measures,
-                                                         ref_midi>0,
-                                                         est_midi>0, **kwargs)
+     scores['Voicing False Alarm']) = filter_kwargs(voicing_measures,
+                                                    ref_frame_midi>0,
+                                                    est_frame_midi>0, **kwargs)
 
-    scores['Raw Pitch Accuracy'] = util.filter_kwargs(mir_eval.melody.raw_pitch_accuracy,
-                                                      ref_midi>0, ref_midi*100,
-                                                      est_midi>0, est_midi*100,
-                                                      **kwargs)
+    scores['Raw Pitch Accuracy'] = filter_kwargs(raw_pitch_accuracy,
+                                                 ref_frame_midi>0,
+                                                 ref_frame_midi*100,
+                                                 est_frame_midi>0,
+                                                 est_frame_midi*100,
+                                                 **kwargs)
+
+    precision, recall, fmeasure = calculate_match_metrics(ref_interval, ref_midi,
+                                                          est_interval, est_midi)
+    scores['Precision COnPOff'] = precision.COnPOff
+    scores['Recall COnPOff'] = recall.COnPOff
+    scores['F Measure COnPOff'] = fmeasure.COnPOff
+
+    scores['Precision COnP'] = precision.COnP
+    scores['Recall COnP'] = recall.COnP
+    scores['F Measure COnP'] = fmeasure.COnP
+
+    scores['Precision COn'] = precision.COn
+    scores['Recall COn'] = recall.COn
+    scores['F Measure COn'] = fmeasure.COn
+
+    print precision, recall, fmeasure
 
     return scores
