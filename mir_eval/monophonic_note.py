@@ -11,7 +11,8 @@ import collections
 import warnings
 from .util import filter_kwargs
 
-from mir_eval.melody import voicing_measures, raw_pitch_accuracy
+from mir_eval.melody import voicing_measures, raw_pitch_accuracy,\
+                            raw_chroma_accuracy, overall_accuracy
 
 def remove_zero_notes(interval, value):
     '''
@@ -82,7 +83,112 @@ def rasterize_notes(interval, value, max_time=0.0, hopsize=0.01):
             values[index] = value[i_note]
     return times, values
 
-def calculate_seg_metrics(interval_A, midi_A, interval_B, midi_B, 
+def pseudomanual_merge(ref_interval, ref_midi, est_interval, est_midi):
+    '''
+    Takes a reference note track and an estimated note track, then merges
+    estimated notes that are overlapped by reference notes and counts the 
+    number of interactions needed.
+
+    :parameters:
+        - ref_interval : np.ndarray, shape=(n_events, 2)
+            Onset and offset time of each note in reference note track.
+        - est_interval : np.ndarray, shape=(n_events, 2)
+            Onset and offset time of each note in estimated note track.
+        - est_midi : np.ndarray
+            Array of MIDI note values (not necessarily integer) 
+            in estimated note track.
+    :returns:
+        - new_interval : np.ndarray, shape=(n_events, 2)
+            Intervals without the deleted notes.
+        - new_midi : np.ndarray
+            Array of MIDI note values of the non-deleted notes.
+    '''
+
+    n_est = len(est_midi)
+    n_ref = len(ref_midi)
+    time_overlaps, timepitch_overlaps = calculate_overlaps(ref_interval,
+                                                           ref_midi,
+                                                           est_interval,
+                                                           est_midi)
+
+    # make merge plan
+
+    merge_plan = []
+    last_est = 0
+
+    for i_ref in range(n_ref):
+        overlaps = [iv for iv in time_overlaps if 
+                    iv[0]==i_ref and time_overlaps[iv][2] > 0.5]
+        est_overlap_ind = [el[1] for el in overlaps]
+        if est_overlap_ind:
+            # print "aha", range(last_est, min(est_overlap_ind)+1)
+            merge_plan.extend([el] for 
+                              el in range(last_est, min(est_overlap_ind)))
+            merge_plan.append(est_overlap_ind)
+            last_est = max(est_overlap_ind) + 1
+    merge_plan.extend([el] for el in range(last_est, n_est))
+
+    # compose new notes from merge plan
+
+    new_interval = list()
+    new_midi = list()
+
+    for group in merge_plan:
+        dur = [ei[1]-ei[0] for ei in est_interval[group, :]]
+        onset = min([ei[0] for ei in est_interval[group, :]])
+        offset = max([ei[1] for ei in est_interval[group, :]])
+        midi = est_midi[group][np.argmax(dur)]
+        new_interval.append((onset, offset))
+        new_midi.append(midi)
+
+    return np.array(new_interval), np.array(new_midi)
+
+
+def pseudomanual_delete(ref_interval, ref_midi, est_interval, est_midi):
+    '''
+    Takes a reference note track and an estimated note track, removes estimated
+    notes that are not overlapped by reference notes and counts the number of
+    interactions needed.
+
+    :parameters:
+        - ref_interval : np.ndarray, shape=(n_events, 2)
+            Onset and offset time of each note in reference note track.
+        - est_interval : np.ndarray, shape=(n_events, 2)
+            Onset and offset time of each note in estimated note track.
+        - est_midi : np.ndarray
+            Array of MIDI note values (not necessarily integer) 
+            in estimated note track.
+    :returns:
+        - new_interval : np.ndarray, shape=(n_events, 2)
+            Intervals without the deleted notes.
+        - new_midi : np.ndarray
+            Array of MIDI note values of the non-deleted notes.
+    '''
+
+    n_est = len(est_midi)
+    time_overlaps, timepitch_overlaps = calculate_overlaps(ref_interval,
+                                                           ref_midi,
+                                                           est_interval,
+                                                           est_midi)
+    est_overlapped = set([it[1] for it in time_overlaps])
+    est_non_overlapped = [i for i in range(n_est) if not i in est_overlapped]
+
+    edit_count_naive = len(est_non_overlapped)
+
+    edit_count = 0
+    old_note = -2
+    for note in est_non_overlapped:
+        if (note - old_note) > 1:
+            edit_count += 1
+        old_note = note
+
+    est_overlapped = np.array(list(est_overlapped))
+    new_interval = est_interval[est_overlapped,:]
+    new_midi = est_midi[est_overlapped]
+
+    return new_interval, new_midi, edit_count_naive, edit_count
+
+def calculate_overlaps(interval_A, midi_A, interval_B, midi_B, 
                           midi_threshold=0.5, onset_threshold=0.05):
     '''
     Calculate segmentation metrics from Molina's paper and some additional
@@ -124,7 +230,6 @@ def calculate_seg_metrics(interval_A, midi_A, interval_B, midi_B,
                 if is_correct_pitch:
                     timepitch_overlaps[(i,j)] = (t_overlap,
                                                  rel_overlap_A, rel_overlap_B)
-    # TODO -- implement the actual measures, these are just preliminary
     return time_overlaps, timepitch_overlaps
 
 def calculate_matches(interval_A, midi_A, interval_B, midi_B, 
@@ -192,20 +297,24 @@ def calculate_match_metrics(ref_interval, ref_midi, est_interval, est_midi):
     proposed metrics.
 
     :parameters:
-        - interval_ref : np.ndarray, shape=(n_events, 2)
+        - ref_interval : np.ndarray, shape=(n_events, 2)
             Onset and offset time of each note in reference note track.
-        - midi_ref : np.ndarray
+        - ref_midi : np.ndarray
             Array of MIDI note values (not necessarily integer) 
             in reference note track.
-        - interval_est : np.ndarray, shape=(n_events, 2)
+        - est_interval : np.ndarray, shape=(n_events, 2)
             Onset and offset time of each note in estimated note track.
-        - midi_est : np.ndarray
+        - est_midi : np.ndarray
             Array of MIDI note values (not necessarily integer) 
             in estimated note track.
 
     :returns:
         - precision: pd.DataFrame
-
+            Precision of all implemented metrics.
+        - recall: pd.DataFrame
+            Recall of all implemented metrics.
+        - fmeasure: pd.DataFrame
+            Harmonic mean of precision and recall.
     '''
 
     matched_est_to_ref = calculate_matches(ref_interval, ref_midi, 
@@ -272,6 +381,19 @@ def evaluate(ref_interval, ref_midi, est_interval, est_midi, **kwargs):
                                                  est_frame_midi>0,
                                                  est_frame_midi*100,
                                                  **kwargs)
+    scores['Raw Chroma Accuracy'] = filter_kwargs(raw_chroma_accuracy,
+                                                       ref_frame_midi>0,
+                                                       ref_frame_midi*100,
+                                                       est_frame_midi>0,
+                                                       est_frame_midi*100,
+                                                       **kwargs)
+
+    scores['Overall Accuracy'] = filter_kwargs(overall_accuracy,
+                                                    ref_frame_midi>0,
+                                                    ref_frame_midi*100,
+                                                    est_frame_midi>0,
+                                                    est_frame_midi*100,
+                                                    **kwargs)
 
     precision, recall, fmeasure = calculate_match_metrics(ref_interval, ref_midi,
                                                           est_interval, est_midi)
@@ -287,9 +409,113 @@ def evaluate(ref_interval, ref_midi, est_interval, est_midi, **kwargs):
     scores['Recall COn'] = recall.COn
     scores['F Measure COn'] = fmeasure.COn
 
-    time_overlaps, timepitch_overlaps =  calculate_seg_metrics(ref_interval,
-                                                               ref_midi,
-                                                               est_interval,
-                                                               est_midi)
+    (del_interval, del_midi, 
+     del_edit_count_naive, del_edit_count) =  pseudomanual_delete(ref_interval,
+                                                          ref_midi,
+                                                          est_interval,
+                                                          est_midi)
+    del_frame_times, del_frame_midi = rasterize_notes(del_interval, del_midi,
+                                                      max_time)
+    (scores['Del Voicing Recall'],
+    scores['Del Voicing False Alarm']) = filter_kwargs(voicing_measures,
+                                                       ref_frame_midi>0,
+                                                       del_frame_midi>0, **kwargs)
+
+    scores['Del Raw Pitch Accuracy'] = filter_kwargs(raw_pitch_accuracy,
+                                                     ref_frame_midi>0,
+                                                     ref_frame_midi*100,
+                                                     del_frame_midi>0,
+                                                     del_frame_midi*100,
+                                                     **kwargs)
+    scores['Del Raw Chroma Accuracy'] = filter_kwargs(raw_chroma_accuracy,
+                                                       ref_frame_midi>0,
+                                                       ref_frame_midi*100,
+                                                       del_frame_midi>0,
+                                                       del_frame_midi*100,
+                                                       **kwargs)
+
+    scores['Del Overall Accuracy'] = filter_kwargs(overall_accuracy,
+                                                    ref_frame_midi>0,
+                                                    ref_frame_midi*100,
+                                                    del_frame_midi>0,
+                                                    del_frame_midi*100,
+                                                    **kwargs)
+    
+
+    (del_precision, 
+     del_recall, 
+     del_fmeasure) = calculate_match_metrics(ref_interval, ref_midi,
+                                             del_interval, del_midi)
+    # scores['Del Precision COnPOff'] = del_precision.COnPOff
+    # scores['Del Recall COnPOff'] = del_recall.COnPOff
+    scores['Del F Measure COnPOff'] = del_fmeasure.COnPOff
+
+    # scores['Del Precision COnP'] = del_precision.COnP
+    # scores['Del Recall COnP'] = del_recall.COnP
+    scores['Del F Measure COnP'] = del_fmeasure.COnP
+
+    # scores['Del Precision COn'] = del_precision.COn
+    # scores['Del Recall COn'] = del_recall.COn
+    scores['Del F Measure COn'] = del_fmeasure.COn
+
+    # scores['Del Count Naive'] = del_edit_count_naive
+    # scores['Del Count'] = del_edit_count
+    # scores['Del Prop Naive'] = float(del_edit_count_naive)/len(ref_midi)
+    # scores['Del Prop'] = float(del_edit_count)/len(ref_midi)
+
+    (mer_interval, mer_midi) =  pseudomanual_merge(ref_interval,
+                                                          ref_midi,
+                                                          del_interval,
+                                                          del_midi)
+    mer_frame_times, mer_frame_midi = rasterize_notes(mer_interval, mer_midi,
+                                                      max_time)
+
+    (scores['Mer Voicing Recall'],
+    scores['Mer Voicing False Alarm']) = filter_kwargs(voicing_measures,
+                                                       ref_frame_midi>0,
+                                                       mer_frame_midi>0, **kwargs)
+
+    scores['Mer Raw Pitch Accuracy'] = filter_kwargs(raw_pitch_accuracy,
+                                                     ref_frame_midi>0,
+                                                     ref_frame_midi*100,
+                                                     mer_frame_midi>0,
+                                                     mer_frame_midi*100,
+                                                     **kwargs)
+    scores['Mer Raw Chroma Accuracy'] = filter_kwargs(raw_chroma_accuracy,
+                                                       ref_frame_midi>0,
+                                                       ref_frame_midi*100,
+                                                       mer_frame_midi>0,
+                                                       mer_frame_midi*100,
+                                                       **kwargs)
+
+    scores['Mer Overall Accuracy'] = filter_kwargs(overall_accuracy,
+                                                    ref_frame_midi>0,
+                                                    ref_frame_midi*100,
+                                                    mer_frame_midi>0,
+                                                    mer_frame_midi*100,
+                                                    **kwargs)
+
+    (mer_precision, 
+     mer_recall, 
+     mer_fmeasure) = calculate_match_metrics(ref_interval, ref_midi,
+                                             mer_interval, mer_midi)
+    # scores['Mer Precision COnPOff'] = mer_precision.COnPOff
+    # scores['Mer Recall COnPOff'] = mer_recall.COnPOff
+    scores['Mer F Measure COnPOff'] = mer_fmeasure.COnPOff
+
+    # scores['Mer Precision COnP'] = mer_precision.COnP
+    # scores['Mer Recall COnP'] = mer_recall.COnP
+    scores['Mer F Measure COnP'] = mer_fmeasure.COnP
+
+    # scores['Mer Precision COn'] = mer_precision.COn
+    # scores['Mer Recall COn'] = mer_recall.COn
+    scores['Mer F Measure COn'] = mer_fmeasure.COn
+
+    scores['Mer Overall Accuracy'] = filter_kwargs(overall_accuracy,
+                                                    ref_frame_midi>0,
+                                                    ref_frame_midi*100,
+                                                    mer_frame_midi>0,
+                                                    mer_frame_midi*100,
+                                                    **kwargs)
 
     return scores
