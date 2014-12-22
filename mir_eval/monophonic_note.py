@@ -113,20 +113,28 @@ def calculate_matches(interval_A, midi_A, interval_B, midi_B,
     n_A = len(midi_A)
 
     matched = pd.DataFrame(0, index=range(n_A), 
-                              columns=['COnPOff', 'COnP', 'COn'])
+                              columns=['COnPOff', 'COnP', 'COn', 'CN'])
     
     conpoff_matches = []
     conp_matches = []
     con_matches = []
+    cn_matches = []
 
     for i, iv_A in enumerate(interval_A):
         offset_thresh = iv_A[0] + (iv_A[1]-iv_A[0]) * np.array([0.8, 1.2])
 
         for j, iv_B in enumerate(interval_B):
-            is_overlap = iv_A[0] <= iv_B[1] and iv_A[1] >= iv_B[0]
+            is_overlap = iv_A[0] < iv_B[1] and iv_A[1] > iv_B[0]
             is_correct_pitch = abs(midi_A[i]-midi_B[j]) < midi_threshold
             is_matched_onset = abs(iv_A[0]-iv_B[0]) < onset_threshold
             is_matched_offset = iv_B[1] > offset_thresh[0] and iv_B[1] < offset_thresh[1]
+            is_good_overlap = False
+            if is_overlap:
+                overlap = min(iv_A[1], iv_B[1]) - max(iv_A[0], iv_B[0])
+                max_length = max(iv_A[1]-iv_A[0], iv_B[1]-iv_B[0])
+                overlap_ratio = float(overlap)/max_length
+                print overlap_ratio
+                is_good_overlap = overlap_ratio > 0.5 and abs(midi_A[i]-midi_B[j]) < 0.1
 
             if is_matched_onset and is_correct_pitch and is_matched_offset:
                 if not j in conpoff_matches:
@@ -142,6 +150,11 @@ def calculate_matches(interval_A, midi_A, interval_B, midi_B,
                 if not j in con_matches:
                     matched.COn[i] = 1
                     con_matches.append(j)
+
+            if is_good_overlap:
+                if not j in cn_matches:
+                    matched.CN[i] = 1
+                    cn_matches.append(j)
 
     return matched
 
@@ -262,5 +275,9 @@ def evaluate(ref_interval, ref_midi, est_interval, est_midi, **kwargs):
     scores['Precision COn'] = precision.COn
     scores['Recall COn'] = recall.COn
     scores['F Measure COn'] = fmeasure.COn
+
+    scores['Precision CN'] = precision.CN
+    scores['Recall CN'] = recall.CN
+    scores['F Measure CN'] = fmeasure.CN
 
     return scores
